@@ -103,16 +103,17 @@ public class PathfindingGrid : MonoBehaviour
                 }
             }
 
-            StartCoroutine(FindPath(startNode, endNode, path));
+            StartCoroutine(FindPath(startNode, endNode));
         }
 
-        if (spawnNPC)
+        if (spawnNPC && npcList.Count < 3)
         {
             spawnNPC = !spawnNPC;
 
             GameObject newNPC = GameObject.CreatePrimitive(PrimitiveType.Cube);
             newNPC.AddComponent<NPC>();
 
+            newNPC.name = "NPC " + npcList.Count;
             npcList.Add(newNPC);
         }
     }
@@ -218,7 +219,7 @@ public class PathfindingGrid : MonoBehaviour
         return distance;
     }
 
-    public IEnumerator FindPath(Node startNode, Node endNode, List<Node> pathSave)
+    public IEnumerator FindPath(Node startNode, Node endNode)
     {
         List<Node> closedSet = new List<Node>();
         List<Node> openSet = new List<Node>();
@@ -294,12 +295,98 @@ public class PathfindingGrid : MonoBehaviour
                 break;
             }
 
-            yield return new WaitForSeconds(0.02f);
+            yield return new WaitForSeconds(0.005f);
         }
 
-        pathSave = RetracePath(startNode, endNode);
+        RetracePath(startNode, endNode);
 
         yield break;
+    }
+
+    public IEnumerator FindPathNPC(Node startNode, Node endNode, GameObject NPC)
+    {
+        NPC.GetComponent<NPC>().trackingPath = true;
+
+        List<Node> closedSet = new List<Node>();
+        List<Node> openSet = new List<Node>();
+
+        startNode.G = 0;
+        startNode.H = GetDistance(startNode, endNode);
+        startNode.parentNode = null;
+
+        openSet.Add(startNode);
+        Node currentNode = openSet[0];
+
+        for (int x = 0; x < width; x++)
+        {
+            for (int y = 0; y < height; y++)
+            {
+                if (!Grid[x][y].isPassable)
+                {
+                    Grid[x][y].nodeObject.GetComponent<MeshRenderer>().material.color = Color.gray2;
+                }
+            }
+        }
+
+        while (openSet.Count > 0)
+        {
+            #region ChangeColor
+            if (!npcs)
+            {
+                if (closedSet.Count > 0)
+                {
+                    foreach (Node node in closedSet)
+                    {
+                        node.nodeObject.GetComponent<MeshRenderer>().material.color = Color.lightBlue;
+                    }
+                }
+                foreach (Node node in openSet)
+                {
+                    node.nodeObject.GetComponent<MeshRenderer>().material.color = Color.lightGreen;
+                }
+                startNode.nodeObject.GetComponent<MeshRenderer>().material.color = Color.green;
+                endNode.nodeObject.GetComponent<MeshRenderer>().material.color = Color.red;
+            }
+            #endregion
+
+            foreach (Node neighbor in currentNode.neighborNodes)
+            {
+                if (!closedSet.Contains(neighbor) && neighbor.isPassable)
+                {
+                    float potentialG = currentNode.G + GetDistance(currentNode, neighbor);
+
+                    if (!openSet.Contains(neighbor) || potentialG < neighbor.G)
+                    {
+                        neighbor.G = potentialG;
+                        neighbor.H = GetDistance(neighbor, endNode);
+                        neighbor.parentNode = currentNode;
+                        openSet.Add(neighbor);
+                    }
+                }
+            }
+
+            foreach (Node node in openSet)
+            {
+                if (node.GetFCost() <= currentNode.GetFCost())
+                {
+                    currentNode = node;
+                    openSet.Remove(currentNode);
+                    closedSet.Add(currentNode);
+                    break;
+                }
+            }
+
+            if (currentNode == endNode)
+            {
+                break;
+            }
+
+            yield return new WaitForSeconds(0.005f);
+        }
+
+        NPC.GetComponent<NPC>().nextNode = NextPathNodeNPC(startNode, endNode);
+
+        NPC.GetComponent<NPC>().trackingPath = false;
     }
 
     public List<Node> RetracePath(Node startNode, Node endNode)
@@ -325,5 +412,27 @@ public class PathfindingGrid : MonoBehaviour
         }
 
         return pathList;
+    }
+
+    public Node NextPathNodeNPC(Node startNode, Node endNode)
+    {
+        List<Node> pathList = new List<Node>();
+        Node currentNode = endNode;
+
+        while (currentNode != startNode)
+        {
+            pathList.Add(currentNode);
+            currentNode = currentNode.parentNode;
+        }
+
+        pathList.Add(startNode);
+        pathList.Reverse();
+
+        foreach (Node node in pathList)
+        {
+            node.nodeObject.GetComponent<MeshRenderer>().material.color = Color.lightBlue;
+        }
+
+        return pathList.Count > 1 ? pathList[1] : pathList[0];
     }
 }

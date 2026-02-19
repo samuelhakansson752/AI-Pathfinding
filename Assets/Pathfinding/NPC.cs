@@ -9,13 +9,14 @@ public class NPC : MonoBehaviour
 {
     Node currentNode;
     Node prevNode;
+    public Node nextNode;
     Node rndGoal;
-    List<Node> nodePath;
 
     PathfindingGrid pfGrid;
 
     GameObject npcGO;
     float moveTimer = 0;
+    public bool trackingPath = false;
 
     private void Start()
     {
@@ -46,21 +47,26 @@ public class NPC : MonoBehaviour
         position.y = 1;
         npcGO.transform.position = position;
 
-        Move();
+        StartCoroutine(pfGrid.FindPathNPC(currentNode, rndGoal, gameObject));
     }
     private void Move()
     {
-        StartCoroutine(pfGrid.FindPath(currentNode, rndGoal, nodePath));
-
-        if (nodePath[1].isPassable)
+        if (nextNode.isPassable)
         {
             prevNode = currentNode;
-            prevNode.nodeObject.GetComponent<MeshRenderer>().material.color = Color.gray;
             prevNode.isPassable = true;
 
-            currentNode = nodePath[1];
+            currentNode = nextNode;
             currentNode.isPassable = false;
+
+            prevNode.nodeObject.GetComponent<MeshRenderer>().material.color = Color.gray;
+
+            Vector3 position = currentNode.position;
+            position.y = 1;
+            npcGO.transform.position = position;
         }
+
+        StartCoroutine(pfGrid.FindPathNPC(currentNode, rndGoal, gameObject));
     }
 
     private void RandomizeGoal() 
@@ -83,11 +89,14 @@ public class NPC : MonoBehaviour
         {
             RandomizeGoal();
         }
-
-        if (moveTimer > 1)
+        else if (moveTimer > 1)
         {
             moveTimer = 0;
-            Move();
+
+            if (!trackingPath)
+            {
+                Move();
+            }
         }
         else
         {
